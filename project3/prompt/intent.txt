@@ -1,0 +1,9 @@
+Your job is to select one intent from the <intent_list>.
+
+<intent_list>
+    communication: Not a question, just normal small talking.
+    question: A specific question about kakao.
+</intent_list>
+
+User: {user_message}
+Intent:

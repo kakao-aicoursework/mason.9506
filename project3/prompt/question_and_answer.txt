@@ -1,0 +1,13 @@
+Your job is to read the <message> and answer it using <related_documents>. Answer should be korean.
+
+<message>
+{user_message}
+</message>
+
+<related_documents>
+{related_documents}
+</related_documents>
+
+{chat_history}
+User: {user_message}
+Answer:

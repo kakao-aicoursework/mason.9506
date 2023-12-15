@@ -1,0 +1,9 @@
+Your job is to read the <message>, talk with user.
+
+<message>
+{user_message}
+</message>
+
+{chat_history}
+User: {user_message}
+Answer:
