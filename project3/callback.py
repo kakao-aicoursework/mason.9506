@@ -19,6 +19,7 @@ from langchain.vectorstores import Chroma
 from langchain.chains import ConversationChain, LLMChain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import ChatPromptTemplate
+from langchain.memory import ConversationBufferMemory, FileChatMessageHistory
 
 CHROMA_PERSIST_DIR = "../chroma-persist"
 CHROMA_COLLECTION_NAME = "dosu-bot"
@@ -48,6 +49,14 @@ def create_chain(llm, template_path, output_key):
         verbose=True,
     )
 
+def get_chat_history(history):
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        input_key="user_message",
+        chat_memory=history,
+    )
+    return memory.buffer
+
 # db 불러오기
 db = Chroma(
     persist_directory=CHROMA_PERSIST_DIR,
@@ -55,12 +64,17 @@ db = Chroma(
     collection_name=CHROMA_COLLECTION_NAME,
 )
 
+# 초기 history 생성
+history = FileChatMessageHistory("./chat_history.json")
+
 async def callback_handler(request: ChatbotRequest) -> dict:
 
     # ===================== start =================================
     llm = ChatOpenAI(temperature=0.1)
-    search = DuckDuckGoSearchAPIWrapper()
-    search.region = 'kr-kr'
+    
+    # search = DuckDuckGoSearchAPIWrapper()
+    # search.region = 'kr-kr'
+    
     # user message
     user_message = request.userRequest.utterance
     
@@ -76,11 +90,16 @@ async def callback_handler(request: ChatbotRequest) -> dict:
         template_path="./prompt/intent.txt",
         output_key="intent",
     )
-    default_chain = ConversationChain(llm=llm, output_key="default")
+    default_chain =  create_chain(
+        llm=llm,
+        template_path="./prompt/default.txt",
+        output_key="default",
+    )
 
     # 답변
     context = dict(user_message=user_message)
     context["input"] = context["user_message"]
+    context["chat_history"] = get_chat_history(history)[-1000:]  # history 최근 1000자만 사용
 
     # user message 의도 파악
     intent = intent_chain.run(context)
@@ -88,10 +107,15 @@ async def callback_handler(request: ChatbotRequest) -> dict:
 
     # 의도에 따른 모델 실행
     if intent == "question":
-        context["related_documents"] = db.similarity_search(context["user_message"])
-        answer = qna_chain(context)
+        context["related_documents"] = db.similarity_search(context["user_message"])[:3]
+        answer = qna_chain.run(context)
     else:
-        answer = default_chain.run(context["user_message"])
+        answer = default_chain.run(context)
+
+    print(f"answer = {answer}")
+
+    history.add_user_message(user_message)
+    history.add_ai_message(answer)
 
    # 참고링크 통해 payload 구조 확인 가능
     payload = {
