@@ -1,22 +1,16 @@
 from dto import ChatbotRequest
-from samples import list_card
 import aiohttp
 import time
-# import logging
 import openai
 import os
 from langchain import LLMChain
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts.chat import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-)
-from langchain.schema import SystemMessage
+from langchain.prompts.chat import ChatPromptTemplate
 from langchain.utilities import DuckDuckGoSearchAPIWrapper
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 
-from langchain.chains import ConversationChain, LLMChain
+from langchain.chains import LLMChain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory, FileChatMessageHistory
@@ -67,6 +61,10 @@ db = Chroma(
 # 초기 history 생성
 history = FileChatMessageHistory("./chat_history.json")
 
+# search api 생성
+search = DuckDuckGoSearchAPIWrapper()
+search.region = 'kr-kr'
+
 async def callback_handler(request: ChatbotRequest) -> dict:
 
     # ===================== start =================================
@@ -90,6 +88,11 @@ async def callback_handler(request: ChatbotRequest) -> dict:
         template_path="./prompt/intent.txt",
         output_key="intent",
     )
+    more_information_chain = create_chain(
+        llm=llm,
+        template_path="./prompt/more_information.txt",
+        output_key="more_information",
+    )
     default_chain =  create_chain(
         llm=llm,
         template_path="./prompt/default.txt",
@@ -99,7 +102,7 @@ async def callback_handler(request: ChatbotRequest) -> dict:
     # 답변
     context = dict(user_message=user_message)
     context["input"] = context["user_message"]
-    context["chat_history"] = get_chat_history(history)[-1000:]  # history 최근 1000자만 사용
+    context["chat_history"] = get_chat_history(history)[-500:]  # history 최근 1000자만 사용
 
     # user message 의도 파악
     intent = intent_chain.run(context)
@@ -107,8 +110,16 @@ async def callback_handler(request: ChatbotRequest) -> dict:
 
     # 의도에 따른 모델 실행
     if intent == "question":
-        context["related_documents"] = db.similarity_search(context["user_message"])[:3]
+        context["related_documents"] = db.similarity_search(context["user_message"])[:2]
         answer = qna_chain.run(context)
+    elif intent == "more information":
+        context["related_documents"] = db.similarity_search(context["user_message"])[:2]
+        search_results = search.results(context["input"], max_results=2)
+        text = {}
+        for search_result in search_results:
+            text[search_result['title']] = search_result['link'] + " " + search_result['snippet'][:500]
+            context["more_information"] = text
+            answer = more_information_chain.run(context)
     else:
         answer = default_chain.run(context)
 

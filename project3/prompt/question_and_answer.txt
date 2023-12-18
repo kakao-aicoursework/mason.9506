@@ -1,4 +1,4 @@
-Your job is to read the <message> and answer it using <related_documents>. Answer should be korean.
+Your job is to read the <message> and answer it using <related_documents>. Answer should be korean shorter than 100 characters.
 
 <message>
 {user_message}

@@ -1,0 +1,17 @@
+Your job is to read the <message> and answer it using <related_documents> and <more_information>. Answer should be korean and shorter than 100 characters.
+
+<message>
+{user_message}
+</message>
+
+<related_documents>
+{related_documents}
+</related_documents>
+
+<more_information>
+{more_information}
+</more_information>
+
+{chat_history}
+User: {user_message}
+Answer:
